@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>출근길 서바이벌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: full-bleed canvas (underground platform) + station-signage HUD; one world, single theme by choice */
+  --floor:#cfcbc0;      /* platform tile */
+  --ink:#1b2124;        /* charcoal, biased toward line green */
+  --panel:#1e2629;      /* LED board / dark panels */
+  --paper:#f6f4ee;      /* sign board white */
+  --line2:#00a84d;      /* line colour, the one accent */
+  --safety:#ffc928;     /* tactile paving yellow */
+  --led:#ffb300;        /* amber LED text */
+  --danger:#e5484d;
+  --boss:#b03bd6;
+  --muted:#6d7679;
+  --font-display:"Do Hyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-led:"VT323","Courier New",monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#14191c;color:var(--ink);font-family:var(--font-body);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;word-break:keep-all}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:3px solid var(--safety);outline-offset:2px}
+#app{position:relative;height:100%;width:100%;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:0;pointer-events:none}
+#xpbar{position:absolute;left:0;right:0;top:0;height:9px;background:rgba(15,20,22,.7);border-bottom:1px solid #0b0f10}
+#xpbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#00a84d,#5df0a0);box-shadow:0 0 10px rgba(93,240,160,.7);transition:width .12s linear}
+.hud-row{position:absolute;top:18px;left:16px;right:16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.vitals{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 0;max-width:250px}
+.lvline{display:flex;align-items:baseline;gap:8px;font-weight:700;font-size:13px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.lvline b{font-family:var(--font-display);font-weight:400;font-size:24px;line-height:1}
+.hp{position:relative;height:20px;border-radius:10px;background:rgba(15,20,22,.8);overflow:hidden;border:2px solid #0b0f10;box-shadow:0 2px 0 rgba(0,0,0,.3)}
+.hp i{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(180deg,#ff7a7e,#e5484d 55%,#b92f35);transition:width .15s}
+.hp span{position:absolute;inset:0;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 1px 1px rgba(0,0,0,.6)}
+.board{flex:0 0 auto;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#263033,#161c1e);border-radius:9px;padding:6px 13px 6px 8px;border:2px solid #0b0f10;box-shadow:0 3px 0 rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08)}
+.roundel{width:26px;height:26px;border-radius:50%;background:var(--line2);color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-size:18px;line-height:1;flex:none;box-shadow:inset 0 -2px 0 rgba(0,0,0,.2)}
+#clock{font-family:var(--font-led);font-size:36px;line-height:.8;color:var(--led);letter-spacing:.04em;text-shadow:0 0 10px rgba(255,179,0,.7);font-variant-numeric:tabular-nums}
+.stn{display:flex;flex-direction:column;line-height:1.05}
+.stn small{font-size:10px;color:#8e999c;font-weight:500}
+.stn b{font-family:var(--font-display);font-weight:400;font-size:17px;color:var(--led);text-shadow:0 0 8px rgba(255,179,0,.5)}
+.side{flex:1 1 0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0;max-width:250px}
+.kills{font-size:13px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);font-variant-numeric:tabular-nums}
+.kills b{font-family:var(--font-display);font-weight:400;font-size:24px}
+.hudbtns{display:flex;gap:6px;pointer-events:auto}
+.hudbtns button{background:rgba(15,20,22,.82);color:var(--paper);font-size:12px;font-weight:600;padding:6px 10px;border-radius:6px;min-height:30px;border:1px solid rgba(255,255,255,.12)}
+.hudbtns button:hover{background:#000}
+#bossbar{position:absolute;left:50%;top:84px;transform:translateX(-50%);width:min(460px,calc(100% - 32px));text-align:center}
+#bossbar label{font-family:var(--font-display);font-size:18px;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.9),0 0 12px rgba(176,59,214,.9)}
+#bossbar div{height:12px;background:rgba(15,20,22,.85);border:2px solid #0b0f10;border-radius:7px;overflow:hidden;margin-top:2px}
+#bossbar i{display:block;height:100%;background:linear-gradient(180deg,#d37af0,#b03bd6 60%,#7b1fa0);width:100%;transition:width .12s}
+#bossbar label{font-variant-numeric:tabular-nums}
+#bossbar.wait i{background:linear-gradient(180deg,#ffe07a,#ffb300 60%,#c98500)}
+#bossbar.wait label{text-shadow:0 2px 4px rgba(0,0,0,.9)}
+#bossbar.rage i{background:linear-gradient(180deg,#ff8a8e,#e5484d 60%,#a82228)}
+#bossbar.rage label{color:#ffd0d2;text-shadow:0 2px 4px rgba(0,0,0,.9),0 0 12px rgba(229,72,77,.95)}
+#clock.late{color:#ff5a5f;text-shadow:0 0 10px rgba(255,90,95,.8)}
+#build{position:absolute;left:16px;bottom:16px;display:flex;flex-direction:column;gap:5px}
+.slots{display:flex;gap:5px}
+.slot{position:relative;width:42px;height:42px;border-radius:8px;background:rgba(15,20,22,.72);border:2px solid rgba(255,255,255,.14)}
+.slot.on{border-color:var(--line2);background:#e9e5da}
+.slot.pv.on{border-color:var(--safety)}
+.slot.evo{border-color:#ff8a3c;box-shadow:0 0 10px rgba(255,138,60,.7)}
+.slot img{position:absolute;inset:3px;width:calc(100% - 6px);height:calc(100% - 6px)}
+.slot em{position:absolute;right:-4px;bottom:-4px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;background:#0b0f10;color:var(--led);font-style:normal;font-size:10px;font-weight:700;display:grid;place-items:center;border:1px solid rgba(255,255,255,.25)}
+#btnDash{position:absolute;right:18px;bottom:18px;width:78px;height:78px;border-radius:50%;pointer-events:auto;touch-action:none;
+  background:none;border:0;box-shadow:0 6px 18px rgba(0,0,0,.22);display:grid;place-items:center;transition:transform .08s}
+#btnDash::before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(rgba(255,255,255,.9) calc(var(--cd,1)*360deg),rgba(255,255,255,.18) 0);-webkit-mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 3.5px));mask:radial-gradient(closest-side,transparent calc(100% - 4px),#000 calc(100% - 3.5px))}
+#btnDash:active{transform:scale(.94)}
+#btnDash span{position:relative;width:calc(100% - 12px);height:calc(100% - 12px);border-radius:50%;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-display);font-size:18px;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.55);
+  background:radial-gradient(110% 80% at 30% 10%,rgba(255,255,255,.3),rgba(255,255,255,.04) 45%,rgba(255,255,255,0) 60%),linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.03));
+  -webkit-backdrop-filter:blur(5px) saturate(1.4);backdrop-filter:blur(5px) saturate(1.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -8px 14px rgba(255,255,255,.06),inset 0 0 0 1px rgba(255,255,255,.2)}
+#btnDash small{font-family:var(--font-body);font-size:9px;font-weight:600;color:rgba(255,255,255,.6);margin-top:3px}
+#btnDash.ready span{color:#fff}
+#btnDash.ready{box-shadow:0 6px 18px rgba(0,0,0,.22),0 0 14px rgba(255,255,255,.22)}
+
+/* announcements: a slim card under the top bar, so the play area stays clear */
+#banner{--k:var(--line2);--kt:#fff;position:absolute;left:50%;top:128px;transform:translate(-50%,-10px) scale(.96);pointer-events:none;opacity:0;transition:opacity .18s,transform .22s cubic-bezier(.2,1.4,.4,1);width:max-content;max-width:calc(100% - 24px);display:flex;align-items:stretch;background:rgba(16,21,24,.9);border-radius:10px;border:1.5px solid rgba(255,255,255,.16);box-shadow:0 5px 16px rgba(0,0,0,.4);overflow:hidden}
+#banner.on{opacity:1;transform:translate(-50%,0) scale(1)}
+#app.modal #banner{opacity:0}
+#banner .b0{flex:none;display:grid;place-items:center;background:var(--k);color:var(--kt);font-family:var(--font-display);font-size:14px;letter-spacing:.02em;padding:0 11px;min-width:48px}
+#banner .bt{display:flex;align-items:baseline;gap:10px;padding:6px 15px 8px 12px;min-width:0}
+#banner .b1{font-family:var(--font-display);font-size:20px;line-height:1.15;color:#fff;white-space:nowrap}
+#banner .b2{font-size:12.5px;font-weight:600;color:#c3cbce;line-height:1.3}
+#banner .b2:empty{display:none}
+#banner::after{content:"";position:absolute;left:0;bottom:0;height:2.5px;width:100%;background:var(--k);transform-origin:left;transform:scaleX(0)}
+#banner.on::after{animation:bantime var(--d,2.6s) linear forwards}
+@keyframes bantime{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+#banner.warn{--k:var(--danger)}
+#banner.good{--k:var(--safety);--kt:#14191c}
+#banner.boss{--k:var(--boss);--d:3.2s;border-color:rgba(214,130,245,.7);box-shadow:0 0 0 3px rgba(176,59,214,.25),0 0 22px rgba(176,59,214,.6)}
+#banner.boss .b1{font-size:23px;color:#f3d2ff}
+#banner.boss .b0{animation:bosstag .5s ease-in-out infinite alternate}
+@keyframes bosstag{to{filter:brightness(1.35)}}
+
+.slot.base{margin-right:5px;box-shadow:0 0 0 2px var(--safety)}
+/* ---------- overlays ---------- */
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(12,16,18,.74);overflow-y:auto}
+#menu{background:linear-gradient(90deg,rgba(12,16,18,.66),rgba(12,16,18,.1))}
+.roundel.lg{width:50px;height:50px;font-size:34px;border:4px solid #fff;box-shadow:0 0 0 3px var(--line2)}
+
+/* start screen: a platform sign. LED board on top, name plate, line map, then the controls */
+.sign{width:min(560px,100%);background:var(--paper);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden;margin:auto;border:3px solid #0b0f10}
+.led{display:flex;align-items:center;gap:10px;background:#0c1012;padding:7px 12px;font-family:var(--font-led);font-size:22px;line-height:1;color:var(--led);text-shadow:0 0 8px rgba(255,179,0,.65)}
+.led b{font-weight:400;flex:none;color:#5df0a0;text-shadow:0 0 8px rgba(93,240,160,.6)}
+.led-t{flex:1;min-width:0;overflow:hidden;white-space:nowrap;font-family:var(--font-display);font-size:15px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.led-t span{display:inline-block;padding-left:100%;animation:tick 46s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
+.plate{padding:18px 22px 14px;display:flex;align-items:center;gap:14px}
+.plate h1{font-family:var(--font-display);font-weight:400;font-size:clamp(34px,9.4vw,52px);line-height:1;letter-spacing:-.01em}
+.plate p{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:6px;letter-spacing:.02em}
+.band{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:var(--line2);color:#fff;padding:7px 22px;font-family:var(--font-display);font-size:17px;line-height:1.1}
+.band span:first-child{opacity:.8}
+.band span:last-child{text-align:right;opacity:.8}
+.band b{font-weight:400;font-size:21px;background:#fff;color:var(--ink);border-radius:999px;padding:3px 16px}
+.hero{position:relative;height:168px;overflow:hidden;color:#fff}
+.sky{position:absolute;inset:0;width:100%;height:100%}
+.hero-in{position:absolute;inset:0;padding:14px 22px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.when{display:flex;align-items:center;gap:12px;text-shadow:0 2px 8px rgba(20,20,50,.5)}
+.when b{font-family:var(--font-display);font-weight:400;font-size:46px;line-height:.9;font-variant-numeric:tabular-nums}
+.when span{font-size:12.5px;font-weight:600;line-height:1.35;opacity:.95}
+.hero h1{font-family:var(--font-display);font-weight:400;font-size:clamp(36px,10vw,54px);line-height:1;text-shadow:0 3px 0 rgba(20,22,40,.55),0 0 24px rgba(20,22,40,.5)}
+.noti{display:flex;align-items:center;gap:11px;margin:12px 22px 0;padding:9px 12px;background:#fff;border-radius:12px;border:1px solid #dcd8cd;box-shadow:0 2px 0 rgba(0,0,0,.06);min-height:54px;font-size:13.5px;line-height:1.35}
+.noti-ic{flex:none;width:36px;height:36px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-size:13px}
+.noti b{display:block;font-size:12px;color:var(--muted)}
+.noti.in{animation:noti .35s ease-out}
+@keyframes noti{from{transform:translateY(-8px);opacity:0}}
+.route-h{display:flex;justify-content:space-between;align-items:baseline;padding:12px 22px 0;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.route-h b{font-family:var(--font-display);font-weight:400;font-size:16px;color:var(--ink)}
+.idc{width:26px;height:34px;border-radius:5px;background:#fff;position:relative;flex:none;box-shadow:inset 0 9px 0 var(--line2)}
+.idc::before{content:"";position:absolute;left:8px;top:14px;width:10px;height:10px;border-radius:50%;background:#c9c5ba}
+.idc::after{content:"";position:absolute;left:5px;right:5px;bottom:4px;height:3px;border-radius:2px;background:#c9c5ba}
+.stops{list-style:none;display:grid;grid-template-columns:repeat(7,1fr);position:relative;padding:10px 12px 12px;border-bottom:1px solid #d9d5ca}
+.stops::before{content:"";position:absolute;left:calc(12px + (100% - 24px)/14);right:calc(12px + (100% - 24px)/14);top:16px;height:0;border-top:4px dotted var(--ink)}
+.stops li{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;min-width:0}
+.stops li::before{content:"";width:17px;height:17px;border-radius:50%;background:#fff;border:4px solid var(--ink);position:relative}
+.stops li:first-child::before{background:var(--ink);border-color:var(--ink)}
+.stops li:last-child::before{background:var(--danger);border-color:var(--danger);border-radius:4px}
+.stops b{font-family:var(--font-display);font-weight:400;font-size:14px;line-height:1.1}
+.stops small{font-size:10.5px;color:var(--muted);font-weight:600;line-height:1.2}
+.sign-body{padding:14px 22px 18px;display:flex;flex-direction:column;gap:12px}
+.sign-body>p{font-size:14px;line-height:1.55}
+.diff{display:flex;flex-direction:column;gap:6px}
+.diff-label{font-size:12px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between}
+.diff-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.diff-row button{padding:8px 4px 7px;border-radius:9px;background:#fff;border:2px solid #cfcbc0;font-family:var(--font-display);font-size:17px;line-height:1;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:6px}
+.diff-row button:hover{border-color:var(--ink)}
+.diff-row button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 3px 0 var(--c)}
+.d0,.diff-row .d0{--c:#35b25f}.d1,.diff-row .d1{--c:#f2b824}.d2,.diff-row .d2{--c:#f07d24}.d3,.diff-row .d3{--c:#e5484d}
+/* congestion shown the way the platform screens show it: a car that fills up */
+.car{display:flex;gap:2px;align-items:flex-end;justify-content:center;width:56px;height:20px;border:2px solid currentColor;border-radius:5px 5px 3px 3px;padding:2px 3px;position:relative}
+.car::after{content:"";position:absolute;left:8px;right:8px;bottom:-5px;height:3px;background:radial-gradient(circle,currentColor 1.4px,transparent 1.6px) 0 0/50% 100%}
+.car i{flex:1;height:100%;border-radius:1.5px;background:currentColor;opacity:.16}
+.d0 .car i:nth-child(-n+2),.d1 .car i:nth-child(-n+4),.d2 .car i:nth-child(-n+6),.d3 .car i{background:var(--c);opacity:1}
+.diff p{font-size:12.5px;color:var(--muted);font-weight:500;min-height:1.4em}
+.go{align-self:stretch;background:var(--ink);color:#fff;font-family:var(--font-display);font-size:24px;padding:13px 20px;border-radius:10px;border-bottom:5px solid var(--line2);transition:transform .08s;display:flex;align-items:center;justify-content:center;gap:12px}
+.go:hover{background:#000}
+.go:active{transform:translateY(2px)}
+.go.sub{background:transparent;color:var(--ink);border:2px solid var(--ink);font-size:18px;padding:9px 16px}
+.tap{width:34px;height:24px;border-radius:5px;background:linear-gradient(135deg,#5df0a0,#00a84d);position:relative;flex:none;box-shadow:0 0 0 0 rgba(93,240,160,.7);animation:tap 1.6s ease-out infinite}
+.tap::after{content:"";position:absolute;left:5px;top:6px;width:9px;height:7px;border-radius:2px;background:#ffe9a8}
+@keyframes tap{70%{box-shadow:0 0 0 12px rgba(93,240,160,0)}100%{box-shadow:0 0 0 0 rgba(93,240,160,0)}}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.best{font-size:12px;color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums;flex:1 1 120px}
+.link{font-size:12.5px;font-weight:700;color:var(--ink);padding:6px 11px;border-radius:7px;border:1.5px solid #bdb9ae;background:#fff;min-height:32px}
+.link:hover{border-color:var(--ink)}
+.how{border-top:1px solid #dcd8cd;padding-top:11px;display:flex;flex-direction:column;gap:10px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+.keys dt{font-weight:700;color:var(--muted)}
+kbd{font-family:var(--font-body);font-size:12px;font-weight:600;background:#fff;border:1px solid #c9c6bd;border-bottom-width:2px;border-radius:4px;padding:1px 6px;margin-right:2px}
+.tips{list-style:none;display:flex;flex-direction:column;gap:5px;font-size:13px;line-height:1.45}
+.tips li{padding-left:14px;position:relative}
+.tips li::before{content:"";position:absolute;left:0;top:.5em;width:7px;height:7px;border-radius:50%;background:var(--line2)}
+
+.panel{width:min(820px,100%);margin:auto;display:flex;flex-direction:column;gap:14px}
+.panel h2{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,7vw,42px);color:#fff;text-align:center;line-height:1.1;text-wrap:balance;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+.panel h2 small{display:block;font-family:var(--font-body);font-size:13px;font-weight:500;color:#c4cbcd;margin-top:6px;text-shadow:none}
+/* level-up choices are tickets: coloured header, body, tear line, stub */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.card{--c:var(--line2);position:relative;text-align:left;background:var(--paper);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 6px 0 rgba(0,0,0,.4);transition:transform .08s;min-height:190px;animation:cardin .22s backwards;overflow:hidden}
+.card:nth-child(2){animation-delay:.05s}.card:nth-child(3){animation-delay:.1s}
+@keyframes cardin{from{transform:translateY(14px);opacity:0}}
+.card:hover{transform:translateY(-4px)}
+.card.pv{--c:#e0a800}.card.evo{--c:#ff7a1f}.card.heal{--c:var(--danger)}
+.card.evo{background:linear-gradient(180deg,#fff0d9,#fff8ec);box-shadow:0 6px 0 rgba(0,0,0,.4),0 0 26px rgba(255,138,60,.65)}
+.card .tag{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--c);padding:5px 10px 5px 14px}
+.card.pv .tag{color:#2a2100}
+.card .tag kbd{font-family:var(--font-led);font-size:18px;line-height:1;background:var(--ink);color:var(--led);border:0;border-radius:4px;padding:1px 7px;margin:0}
+.card .mid{padding:11px 14px 10px;display:flex;flex-direction:column;gap:7px;flex:1}
+.card .head{display:flex;align-items:center;gap:10px}
+.card .head img{width:50px;height:50px;flex:none;background:#e7e3d8;border-radius:10px;padding:3px}
+.card.evo .head img{background:#ffd9a8}
+.card.fuse{--c:#7a3fe0;background:linear-gradient(160deg,#f1e6ff,#fff3d6 55%,#e2fff0);box-shadow:0 6px 0 rgba(0,0,0,.4),0 0 30px rgba(150,90,255,.8)}
+.card.fuse .head img{background:#2a1f3d}
+.card h3{font-family:var(--font-display);font-weight:400;font-size:23px;line-height:1.1}
+.card .lv{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:3px}
+.pips{display:flex;gap:2.5px}
+.pips i{width:9px;height:9px;border-radius:2px;background:#d6d2c7}
+.pips i.on{background:var(--c)}
+.pips i.new{background:var(--c);box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--c);margin:0 2.5px}
+.card p{font-size:13.5px;line-height:1.45}
+.card .hint{position:relative;font-size:11.5px;color:var(--muted);font-weight:600;border-top:2px dashed #c9c5ba;padding:7px 14px 9px;min-height:32px}
+.card .hint::before,.card .hint::after{content:"";position:absolute;top:-9px;width:16px;height:16px;border-radius:50%;background:#1b2225}
+.card .hint::before{left:-9px}.card .hint::after{right:-9px}
+.lu-foot{display:flex;justify-content:center}
+#btnReroll{background:rgba(255,255,255,.1);color:#fff;border:2px solid rgba(255,255,255,.6);border-radius:8px;font-weight:700;font-size:14px;padding:8px 16px}
+#btnReroll:hover{background:rgba(255,255,255,.2)}
+#btnReroll:disabled{opacity:.35;cursor:default}
+#btnReroll kbd{background:transparent;color:#fff;border-color:rgba(255,255,255,.5);margin-left:6px}
+
+/* settings */
+.sets{background:var(--paper);border-radius:12px;padding:14px 18px;display:grid;grid-template-columns:auto 1fr;gap:12px 16px;align-items:center;width:min(460px,100%);margin:0 auto;font-size:14px}
+.sets label,.sets .lb{font-weight:700}
+.sets input[type=range]{width:100%;accent-color:var(--line2);height:28px}
+.seg{display:flex;gap:5px}
+.seg button{flex:1;padding:7px 6px;border-radius:7px;border:2px solid #cfcbc0;background:#fff;font-weight:700;font-size:13px;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sets .note{grid-column:1/-1;font-size:12px;color:var(--muted);font-weight:500}
+
+/* result: an attendance slip with a stamp */
+.slip{position:relative;background:var(--paper);border-radius:12px;padding:0 0 16px;display:flex;flex-direction:column;gap:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.slip-top{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;padding:8px 18px;font-family:var(--font-display);font-size:16px}
+.chip{display:inline-block;font-family:var(--font-body);font-size:12.5px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--c,#35b25f);color:#14191c}
+.slip h2{color:var(--ink);text-shadow:none;text-align:left;padding:4px 150px 0 18px;min-height:118px;font-size:clamp(26px,6.4vw,40px)}
+.slip h2 small{color:var(--muted)}
+.stamp{position:absolute;right:16px;top:48px;width:118px;height:118px;border-radius:50%;border:5px double var(--c);color:var(--c);display:grid;place-items:center;text-align:center;font-family:var(--font-display);font-size:25px;line-height:1.05;transform:rotate(-13deg);animation:stamp .35s .25s cubic-bezier(.2,1.6,.4,1) backwards;opacity:.92}
+.stamp small{display:block;font-family:var(--font-led);font-size:19px;letter-spacing:.04em}
+.stamp.ok{--c:#008a3f}.stamp.late{--c:#d06a10}.stamp.out{--c:#d23338}
+@keyframes stamp{from{transform:rotate(-13deg) scale(2.2);opacity:0}}
+.eroute{list-style:none;display:grid;grid-template-columns:repeat(7,1fr);position:relative;padding:0 10px}
+.eroute::before{content:"";position:absolute;left:calc(10px + (100% - 20px)/14);right:calc(10px + (100% - 20px)/14);top:6px;height:4px;background:#d6d2c7;border-radius:2px}
+.eroute li{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--muted);text-align:center}
+.eroute li::before{content:"";width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #c3bfb4;position:relative}
+.eroute li.done{color:var(--ink)}.eroute li.done::before{background:var(--line2);border-color:var(--line2)}
+.eroute li.stop{color:var(--danger)}.eroute li.stop::before{background:var(--danger);border-color:var(--danger)}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;padding:0 18px}
+.stat-row div{display:flex;flex-direction:column;gap:2px;border-top:2px solid var(--ink);padding-top:7px}
+.stat-row small{font-size:11px;font-weight:700;color:var(--muted)}
+.stat-row b{font-family:var(--font-display);font-weight:400;font-size:27px;font-variant-numeric:tabular-nums}
+#eTime{font-family:var(--font-led);font-size:38px;line-height:.75;padding-top:4px}
+.dmg{display:flex;flex-direction:column;gap:5px;font-size:12.5px;padding:0 18px}
+.dmg div{display:grid;grid-template-columns:118px 1fr 70px;gap:8px;align-items:center}
+.dmg i{display:block;height:8px;border-radius:4px;background:var(--line2)}
+.dmg span:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.btnrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btnrow .go{align-self:auto;min-width:200px}
+.panel .go.sub{color:#fff;border-color:#fff}
+.panel .go.sub:hover{background:rgba(255,255,255,.12)}
+
+/* in-run pieces added with the signage pass */
+.board{flex-direction:column;align-items:stretch;gap:5px;padding-bottom:7px}
+.board-row{display:flex;align-items:center;gap:10px}
+.mini{display:flex;align-items:center;gap:0;padding:0 2px}
+.mini i{flex:none;width:9px;height:9px;border-radius:50%;background:#3a4549;border:2px solid #3a4549}
+.mini u{flex:1;height:3px;background:#3a4549;min-width:8px}
+.mini i.done,.mini u.done{background:var(--line2);border-color:var(--line2)}
+.mini i.now{background:var(--safety);border-color:#fff;box-shadow:0 0 8px rgba(255,201,40,.9);animation:now 1s ease-in-out infinite alternate}
+@keyframes now{to{transform:scale(1.35)}}
+#hint{position:absolute;left:50%;bottom:112px;transform:translate(-50%,12px);width:max-content;max-width:min(520px,calc(100% - 28px));display:flex;align-items:center;gap:10px;background:rgba(14,19,21,.93);color:#fff;border:2px solid var(--safety);border-radius:10px;padding:8px 14px 8px 8px;font-size:14px;font-weight:600;line-height:1.4;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+#hint.on{opacity:1;transform:translate(-50%,0)}
+#hint b{flex:none;background:var(--safety);color:#14191c;font-family:var(--font-display);font-weight:400;font-size:14px;border-radius:6px;padding:3px 8px}
+#app.modal #hint{opacity:0}
+
+@media (min-width:980px){
+  #menu{justify-content:flex-start;padding-left:clamp(24px,6vw,96px)}
+  #menu .sign{margin:auto 0}
+}
+@media (max-width:640px){
+  .cards{grid-template-columns:1fr;gap:9px}
+  .card{min-height:0}
+  .card .mid{padding:8px 12px 8px;gap:4px}
+  .card h3{font-size:20px}
+  .card .head img{width:40px;height:40px}
+  .card p{font-size:13px}
+  .card .hint{padding:5px 12px 7px;min-height:0}
+  .board{padding:5px 9px 6px 6px}
+  .board-row{gap:7px}
+  #clock{font-size:28px}
+  .stn b{font-size:15px}
+  .roundel{width:22px;height:22px;font-size:15px}
+  .hudbtns button{padding:6px 8px}
+  #bossbar{top:108px}
+  #banner{top:150px}#banner .bt{flex-direction:column;align-items:flex-start;gap:1px;padding:5px 12px 8px 10px}#banner .b1{font-size:17px}#banner.boss .b1{font-size:20px}#banner .b2{font-size:12px}#banner .b0{font-size:13px;padding:0 9px;min-width:42px}
+  .slot{width:34px;height:34px;border-radius:7px}
+  #btnDash{width:98px;height:98px;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  #btnDash span{font-size:21px}
+  #btnDash small{display:none}
+  #app.lefty #btnDash{right:auto;left:calc(14px + env(safe-area-inset-left,0px))}
+  .stat-row{grid-template-columns:repeat(2,1fr)}
+  .plate{padding:14px 16px 12px;gap:11px}.sign-body{padding:12px 16px 16px}.band{padding:6px 16px;font-size:14px}.band b{font-size:17px;padding:3px 11px}
+  .roundel.lg{width:42px;height:42px;font-size:28px}
+  .stops{padding:10px 6px 10px}.stops b{font-size:12px}.stops small{display:none}
+  .stops::before{left:calc(6px + (100% - 12px)/14);right:calc(6px + (100% - 12px)/14);top:16px}
+  .hero{height:150px}.hero-in{padding:12px 16px 10px}.when b{font-size:38px}.noti{margin:10px 16px 0}.route-h{padding:10px 16px 0}
+  .slip h2{padding-right:112px;min-height:92px}
+  .stamp{width:92px;height:92px;font-size:20px;right:10px;top:44px}.stamp small{font-size:15px}
+  #hint{bottom:calc(180px + env(safe-area-inset-bottom,0px));font-size:13px;padding:6px 12px 6px 7px}
+  /* phone HUD: one slim strip on top, one slim row at the bottom, nothing over the middle */
+  .hud-row{top:calc(11px + env(safe-area-inset-top,0px));left:8px;right:8px;align-items:center;gap:7px}
+  .vitals{flex-direction:row;align-items:center;gap:6px;max-width:none}
+  .lvline{font-size:0;gap:0}.lvline b{font-size:19px}.lvline b::before{content:"Lv";font-family:var(--font-body);font-size:10px;font-weight:700;margin-right:2px;opacity:.85}
+  .hp{flex:1;height:15px;border-radius:8px;border-width:1.5px}.hp span{font-size:9.5px}
+  .board{padding:3px 8px 3px 7px;gap:0;border-width:1.5px;box-shadow:none}
+  .board .roundel,.board .mini,.stn small{display:none}
+  .board-row{gap:6px}
+  #clock{font-size:23px}
+  .stn b{font-size:12.5px;max-width:74px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  .side{flex:0 0 auto;max-width:none}
+  .kills,#btnSet{display:none}
+  .hudbtns button{font-size:0;width:34px;height:30px;min-height:30px;padding:0;position:relative}
+  .hudbtns button::before{content:"";position:absolute;left:11px;top:8px;width:12px;height:14px;border-left:4px solid var(--paper);border-right:4px solid var(--paper);box-sizing:border-box}
+  #bossbar{top:calc(50px + env(safe-area-inset-top,0px));width:calc(100% - 20px)}
+  #bossbar label{font-size:14px}
+  #bossbar div{height:8px;border-width:1.5px;margin-top:1px}
+  #banner{top:calc(96px + env(safe-area-inset-top,0px))}
+  #build{left:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));flex-direction:row;gap:6px;opacity:.82}
+  .slots{gap:3px}
+  .slot{width:26px;height:26px;border-radius:6px;border-width:1.5px}
+  .slot.base{margin-right:2px}
+  .slot img{inset:2px;width:calc(100% - 4px);height:calc(100% - 4px)}
+  .slot em{min-width:13px;height:13px;font-size:8.5px;right:-3px;bottom:-3px;padding:0 2px}
+
+  .dmg div{grid-template-columns:96px 1fr 56px}
+}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.led-t span{padding-left:0}}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv" aria-label="게임 화면"></canvas>
+
+  <div id="hud" hidden>
+    <div id="xpbar"><i id="xpfill"></i></div>
+    <div class="hud-row">
+      <div class="vitals">
+        <div class="lvline">레벨 <b id="lv">1</b></div>
+        <div class="hp" role="img" aria-label="멘탈"><i id="hpfill"></i><span id="hptxt">멘탈 100</span></div>
+      </div>
+      <div class="board">
+        <div class="board-row">
+          <span class="roundel">2</span>
+          <span id="clock">08:00</span>
+          <span class="stn"><small id="stnLabel">지금 여기</small><b id="stn">역삼역 앞</b></span>
+        </div>
+        <div class="mini" id="mini" aria-hidden="true"></div>
+      </div>
+      <div class="side">
+        <div class="kills">밀어낸 인파 <b id="kills">0</b></div>
+        <div class="hudbtns">
+          <button id="btnSet" type="button">설정</button>
+          <button id="btnPause" type="button">일시정지</button>
+        </div>
+      </div>
+    </div>
+    <div id="bossbar" hidden><label id="bossname"></label><div><i id="bossfill"></i></div></div>
+    <div id="build"><div class="slots" id="slotsW"></div><div class="slots" id="slotsP"></div></div>
+    <button id="btnDash" type="button" aria-label="대시"><span>대시<small>Space</small></span></button>
+    <div id="hint" role="status"><b>안내</b><span id="hintTxt"></span></div>
+  </div>
+
+  <div id="banner" role="status"><span class="b0" id="b0"></span><span class="bt"><span class="b1" id="b1"></span><span class="b2" id="b2"></span></span></div>
+
+  <section id="menu" class="overlay">
+    <div class="sign">
+      <div class="hero">
+        <svg class="sky" viewBox="0 0 560 190" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+          <defs><linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3f66"/><stop offset=".55" stop-color="#e98b5c"/><stop offset="1" stop-color="#ffd79a"/></linearGradient></defs>
+          <rect width="560" height="190" fill="url(#dawn)"/>
+          <circle cx="430" cy="150" r="46" fill="#fff3c4" opacity=".9"/><circle cx="430" cy="150" r="74" fill="#fff3c4" opacity=".18"/>
+          <g fill="#3a3550" opacity=".55"><rect x="0" y="118" width="46" height="72"/><rect x="52" y="96" width="34" height="94"/><rect x="250" y="110" width="40" height="80"/><rect x="296" y="84" width="30" height="106"/><rect x="500" y="100" width="60" height="90"/></g>
+          <g fill="#1d2233"><rect x="20" y="138" width="56" height="52"/><rect x="84" y="112" width="44" height="78"/><rect x="134" y="146" width="70" height="44"/><rect x="330" y="128" width="50" height="62"/><rect x="386" y="104" width="62" height="86"/><rect x="454" y="140" width="64" height="50"/><rect x="524" y="122" width="36" height="68"/></g>
+          <g fill="#ffd97a"><rect x="92" y="122" width="6" height="7"/><rect x="104" y="122" width="6" height="7"/><rect x="92" y="136" width="6" height="7"/><rect x="116" y="150" width="6" height="7"/><rect x="394" y="114" width="7" height="7"/><rect x="408" y="114" width="7" height="7"/><rect x="422" y="128" width="7" height="7"/><rect x="394" y="142" width="7" height="7"/><rect x="436" y="156" width="7" height="7"/><rect x="340" y="140" width="6" height="7"/><rect x="362" y="154" width="6" height="7"/><rect x="30" y="150" width="6" height="7"/><rect x="54" y="164" width="6" height="7"/></g>
+        </svg>
+        <div class="hero-in">
+          <div class="when"><b>08:00</b><span>월요일 아침<br>출근까지 60분</span></div>
+          <h1>출근길 서바이벌</h1>
+        </div>
+      </div>
+      <div class="noti" aria-live="off"><span class="noti-ic" id="notiIc">알람</span><div><b id="notiFrom"></b><span id="notiTxt"></span></div></div>
+      <div class="route-h"><span>08:00 출발</span><b>오늘의 출근 경로</b><span>09:00 출근</span></div>
+      <ol class="stops" aria-label="출근 경로">
+        <li><b>역 앞</b><small>전단지 알바</small></li>
+        <li><b>개찰구</b><small>백팩 빌런</small></li>
+        <li><b>승강장</b><small>문지기</small></li>
+        <li><b>열차 안</b><small>도착까지 버티기</small></li>
+        <li><b>승강장</b><small>하차 인파</small></li>
+        <li><b>에스컬<wbr>레이터</b><small>캐리어 여행객</small></li>
+        <li><b>회사 앞</b><small>김 팀장</small></li>
+      </ol>
+      <div class="sign-body">
+        <p>역 앞에서 회사 자리에 앉기까지, 한 시간짜리 출근길입니다. 장소마다 버티고 선 진상을 밀어내야 다음으로 넘어가고, 9시를 넘기면 지각입니다.</p>
+        <div class="diff" role="group" aria-label="혼잡도">
+          <span class="diff-label"><span>오늘 출근길 혼잡도</span></span>
+          <div class="diff-row">
+            <button type="button" id="diff0" class="d0" aria-pressed="false"><span class="car" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>여유</button>
+            <button type="button" id="diff1" class="d1" aria-pressed="true"><span class="car" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>보통</button>
+            <button type="button" id="diff2" class="d2" aria-pressed="false"><span class="car" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>혼잡</button>
+            <button type="button" id="diff3" class="d3" aria-pressed="false"><span class="car" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>지옥철</button>
+          </div>
+          <p id="diffBlurb"></p>
+        </div>
+        <button class="go" id="btnStart" type="button"><span class="idc" aria-hidden="true"></span>출근하기</button>
+        <div class="foot">
+          <div class="best" id="best"></div>
+          <button class="link" id="btnHow" type="button" aria-expanded="false">조작법</button>
+          <button class="link" id="btnSetMenu" type="button">설정</button>
+        </div>
+        <div class="how" id="how" hidden>
+          <dl class="keys">
+            <dt>이동</dt><dd><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 방향키, 또는 화면 드래그</dd>
+            <dt>대시</dt><dd><kbd>Space</kbd> 또는 대시 버튼. 터치 화면에서는 끌고 있는 손 말고 다른 손가락으로 아무 곳이나 톡 쳐도 됩니다</dd>
+            <dt>레벨업</dt><dd><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 고르기, <kbd>R</kbd> 다시 뽑기</dd>
+            <dt>일시정지</dt><dd><kbd>P</kbd> <kbd>Esc</kbd></dd>
+          </dl>
+          <ul class="tips">
+            <li>공격은 자동입니다. 움직여서 피하고, 떨어진 것을 주워 레벨을 올리세요.</li>
+            <li>교통카드와 운동화는 기본으로 들고 시작합니다. 그 밖에 무기 네 칸, 장비 네 칸을 채울 수 있습니다. 무기를 6레벨까지 올리고 짝이 되는 장비를 갖추면 진화합니다.</li>
+            <li>진화한 무기 둘이 서로 어울리면 숨겨진 조합이 열립니다. 어떤 짝인지는 직접 찾아보세요.</li>
+            <li>차도와 선로에 빨간 경고가 뜨면 물러나세요. 버스와 열차는 인파도 쓸어 갑니다.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="levelup" class="overlay" hidden>
+    <div class="panel">
+      <h2 id="luTitle">레벨 업<small id="luSub">하나를 골라 챙기세요</small></h2>
+      <div class="cards" id="cards"></div>
+      <div class="lu-foot"><button id="btnReroll" type="button">다시 뽑기</button></div>
+    </div>
+  </section>
+
+  <section id="pause" class="overlay" hidden>
+    <div class="panel">
+      <h2 id="pauseTitle">일시정지<small id="pauseSub">열차가 잠시 정차 중입니다</small></h2>
+      <div class="sets">
+        <label for="setMusic">음악</label><input type="range" id="setMusic" min="0" max="100" step="5">
+        <label for="setSfx">효과음</label><input type="range" id="setSfx" min="0" max="100" step="5">
+        <span class="lb" id="lbFx">이펙트</span>
+        <div class="seg" role="group" aria-labelledby="lbFx"><button type="button" id="fx0">적게</button><button type="button" id="fx1">보통</button><button type="button" id="fx2">많이</button></div>
+        <span class="lb" id="lbBloom">빛 번짐</span>
+        <div class="seg" role="group" aria-labelledby="lbBloom"><button type="button" id="bloom1">켜기</button><button type="button" id="bloom0">끄기</button></div>
+        <span class="lb" id="lbShake">화면 흔들림</span>
+        <div class="seg" role="group" aria-labelledby="lbShake"><button type="button" id="shake1">켜기</button><button type="button" id="shake0">끄기</button></div>
+        <span class="lb" id="lbHand">대시 버튼</span>
+        <div class="seg" role="group" aria-labelledby="lbHand"><button type="button" id="hand0">오른쪽</button><button type="button" id="hand1">왼쪽</button></div>
+        <span class="lb" id="lbTut">안내 (여유 전용)</span>
+        <div class="seg" role="group" aria-labelledby="lbTut"><button type="button" id="btnTut">처음부터 다시 보기</button></div>
+        <p class="note">화면이 끊기면 빛 번짐을 끄고 이펙트를 줄여 보세요. 계속 끊기면 빛 번짐은 저절로 꺼집니다. 설정은 이 기기에 저장됩니다.</p>
+      </div>
+      <div class="btnrow">
+        <button class="go" id="btnResume" type="button">계속 출근하기</button>
+        <button class="go sub" id="btnQuit" type="button">처음 화면으로</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="end" class="overlay" hidden>
+    <div class="panel">
+      <div class="slip">
+        <div class="slip-top"><span>출근 기록부</span><span class="chip" id="eChip"></span></div>
+        <div class="stamp" id="stamp"></div>
+        <h2 id="endTitle"></h2>
+        <ol class="eroute" id="eRoute"></ol>
+        <div class="stat-row">
+          <div><small>시각</small><b id="eTime"></b></div>
+          <div><small>밀어낸 인파</small><b id="eKills"></b></div>
+          <div><small>레벨</small><b id="eLv"></b></div>
+          <div><small>받은 피해</small><b id="eTaken"></b></div>
+        </div>
+        <div class="dmg" id="eDmg"></div>
+      </div>
+      <div class="btnrow">
+        <button class="go" id="btnRetry" type="button">다시 출근하기</button>
+        <button class="go sub" id="btnHome" type="button">처음 화면으로</button>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="js/sim.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
